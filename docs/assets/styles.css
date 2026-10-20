@@ -1,0 +1,95 @@
+/* Crystal AI - Clean Minimalist OpenCode-style Aesthetic */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --bg-primary: #09090b;
+  --bg-surface: #121215;
+  --bg-elevated: #18181b;
+  --border-subtle: #27272a;
+  --border-muted: #3f3f46;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-primary);
+  color: #f4f4f5;
+  overflow-x: hidden;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Subtle clean background mesh (no loud neon glows) */
+.bg-grid-subtle {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+}
+
+/* Soft muted ambient illumination */
+.soft-ambient {
+  background: radial-gradient(ellipse 60% 40% at 50% -10%, rgba(120, 119, 198, 0.08) 0%, rgba(9, 9, 11, 0) 100%);
+}
+
+/* Minimalist Cards */
+.clean-card {
+  background: #111115;
+  border: 1px solid var(--border-subtle);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.clean-card:hover {
+  border-color: #3f3f46;
+  background: #141418;
+}
+
+/* Clean Navigation Bar */
+.clean-nav {
+  background: rgba(9, 9, 11, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Terminal & Code styling */
+.clean-terminal {
+  background: #0d0d10;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.8);
+}
+
+.terminal-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  background-color: #e4e4e7;
+  vertical-align: middle;
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #09090b;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}

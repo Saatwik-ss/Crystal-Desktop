@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crystal AI — Autonomous Coding Studio for Windows & Web</title>
+  <meta name="description" content="Open-source agentic pair programming environment with deep repository intelligence, isolated Git worktrees, Monaco code editor, and instant multi-LLM routing." />
+  <meta name="keywords" content="AI coding assistant, agentic coding, Crystal AI, pair programmer, Groq, Gemini, Git worktrees, Monaco editor, Windows desktop" />
+
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Crystal AI — Autonomous Coding Studio" />
+  <meta property="og:description" content="Open-source agentic pair programming harness for Windows and Web with deep repository understanding." />
+  <meta property="og:image" content="assets/icon.svg" />
+  <meta property="og:url" content="https://saatwik-ss.github.io/Crystal-Desktop/" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            zinc: {
+              850: '#1e1e24',
+              900: '#18181b',
+              950: '#09090b',
+            }
+          },
+          animation: {
+            fadeIn: 'fadeIn 0.2s ease-in-out',
+          },
+          keyframes: {
+            fadeIn: {
+              '0%': { opacity: '0', transform: 'translateY(4px)' },
+              '100%': { opacity: '1', transform: 'translateY(0)' },
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+
+<body class="bg-[#09090b] text-zinc-300 antialiased selection:bg-zinc-700 selection:text-white">
+
+  <!-- Subtle Ambient Glow (Soft, not neon) -->
+  <div class="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 soft-ambient -z-10 pointer-events-none"></div>
+
+  <!-- Subtle Grid Pattern -->
+  <div class="fixed inset-0 bg-grid-subtle opacity-60 -z-20 pointer-events-none"></div>
+
+  <!-- ================= TOP NAVIGATION ================= -->
+  <header class="sticky top-0 z-50 clean-nav">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Brand Logo -->
+      <a href="#" class="flex items-center gap-3 group">
+        <img src="assets/icon.svg" alt="Crystal Logo" class="w-7 h-7 rounded-lg" />
+        <span class="font-bold text-lg tracking-tight text-white flex items-center gap-2">
+          Crystal
+          <span class="text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">v0.1.0</span>
+        </span>
+      </a>
+
+      <!-- Desktop Nav Links -->
+      <nav class="hidden md:flex items-center gap-7 text-xs font-medium text-zinc-400">
+        <a href="#features" class="hover:text-white transition-colors">Features</a>
+        <a href="#demo" class="hover:text-white transition-colors flex items-center gap-1.5 text-zinc-300">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          <span>Web Demo</span>
+        </a>
+        <a href="#worktrees" class="hover:text-white transition-colors">Git Worktrees</a>
+        <a href="#cli" class="hover:text-white transition-colors">CLI</a>
+        <a href="#faq" class="hover:text-white transition-colors">FAQ</a>
+        <a href="https://github.com/Saatwik-ss/Crystal-Desktop" target="_blank" class="hover:text-white transition-colors flex items-center gap-1">
+          <span>GitHub</span>
+          <svg class="w-3 h-3 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+        </a>
+      </nav>
+
+      <!-- Header CTAs -->
+      <div class="hidden sm:flex items-center gap-3">
+        <a href="https://blaid.duckdns.org" target="_blank" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/80 transition-all flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          <span>Try Web Demo</span>
+          <svg class="w-3 h-3 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+        </a>
+
+        <a href="#download" class="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-white hover:bg-zinc-200 text-black transition-all">
+          Download
+        </a>
+      </div>
+
+      <!-- Mobile Menu Button -->
+      <button id="mobile-menu-btn" class="md:hidden p-2 text-zinc-400 hover:text-white focus:outline-none">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+      </button>
+    </div>
+
+    <!-- Mobile Dropdown Menu -->
+    <div id="mobile-menu" class="hidden md:hidden px-4 pt-2 pb-6 space-y-3 bg-[#0d0d10] border-b border-zinc-800 text-sm">
+      <a href="https://blaid.duckdns.org" target="_blank" class="block text-emerald-400 font-medium py-1">Try Live Web Demo (blaid.duckdns.org) &rarr;</a>
+      <a href="#features" class="block text-zinc-300 hover:text-white py-1">Features</a>
+      <a href="#worktrees" class="block text-zinc-300 hover:text-white py-1">Git Worktrees</a>
+      <a href="#cli" class="block text-zinc-300 hover:text-white py-1">CLI Reference</a>
+      <a href="#download" class="block text-white font-semibold py-1">Download for Windows</a>
+      <a href="https://github.com/Saatwik-ss/Crystal-Desktop" target="_blank" class="block text-zinc-400 hover:text-white py-1">GitHub Repository</a>
+    </div>
+  </header>
+
+
+  <!-- ================= HERO SECTION ================= -->
+  <section class="relative pt-16 pb-14 md:pt-24 md:pb-20">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      
+      <!-- Pill Badge linking to live demo -->
+      <a href="https://blaid.duckdns.org" target="_blank" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-300 hover:border-zinc-700 text-xs font-medium mb-8 transition-all group">
+        <span class="flex h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+        <span>Try the live online demo at <strong class="text-white font-mono font-medium">blaid.duckdns.org</strong></span>
+        <span class="text-zinc-500 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+      </a>
+
+      <!-- Headline -->
+      <h1 class="text-4xl sm:text-6xl font-extrabold tracking-tight text-white max-w-4xl mx-auto leading-[1.15]">
+        The Autonomous AI Coding Studio Built for Developers.
+      </h1>
+
+      <!-- Subhead -->
+      <p class="mt-6 text-base sm:text-lg text-zinc-400 max-w-2xl mx-auto font-normal leading-relaxed">
+        Deep repository intelligence, autonomous agent planning, isolated Git worktrees, and instant multi-provider LLM routing (Groq, Gemini, Custom). Available for Windows Desktop and Web.
+      </p>
+
+      <!-- Action Buttons -->
+      <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+        <!-- Live Demo Button -->
+        <a href="https://blaid.duckdns.org" target="_blank" class="px-6 py-3 rounded-lg bg-white hover:bg-zinc-200 text-black font-semibold text-sm transition-all flex items-center gap-2 shadow-sm">
+          <span>Try Live Web Demo</span>
+          <svg class="w-4 h-4 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+        </a>
+
+        <!-- Download for Windows -->
+        <a href="#download" class="px-6 py-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-200 hover:text-white font-medium text-sm border border-zinc-700 transition-all flex items-center gap-2">
+          <svg class="w-4 h-4 fill-current text-zinc-400" viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.949-1.801"/></svg>
+          <span>Download for Windows (x64)</span>
+        </a>
+
+        <!-- GitHub -->
+        <a href="https://github.com/Saatwik-ss/Crystal-Desktop" target="_blank" class="px-5 py-3 rounded-lg bg-zinc-900/60 hover:bg-zinc-800 text-zinc-300 font-medium text-sm border border-zinc-800 transition-all flex items-center gap-2">
+          <svg class="w-4 h-4 fill-current text-zinc-400" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <span>GitHub</span>
+        </a>
+      </div>
+
+      <!-- Quick PowerShell 1-liner -->
+      <div class="mt-8 max-w-xl mx-auto">
+        <div class="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-lg px-3.5 py-2">
+          <div class="flex items-center gap-2 overflow-x-auto text-xs font-mono text-zinc-300">
+            <span class="text-zinc-500 font-bold select-none">&gt;</span>
+            <span id="ps-quick-cmd" class="whitespace-nowrap">powershell -c "irm https://raw.githubusercontent.com/Saatwik-ss/Crystal-Desktop/main/scripts/install-windows.ps1 | iex"</span>
+          </div>
+          <button data-copy-target="ps-quick-cmd" class="ml-3 px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-xs font-mono transition-all flex items-center gap-1 flex-shrink-0">
+            <span>Copy</span>
+          </button>
+        </div>
+        <p class="text-[11px] text-zinc-500 mt-2 text-center">Installs Python venv, CLI command, and desktop harness automatically.</p>
+      </div>
+
+      <!-- ================= HERO PREVIEW WINDOW ================= -->
+      <div class="mt-12 max-w-5xl mx-auto">
+        <div class="clean-terminal text-left overflow-hidden">
+          
+          <!-- Window Header Bar -->
+          <div class="bg-zinc-900/90 px-4 py-2.5 border-b border-zinc-800 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-zinc-700"></span>
+              <span class="w-3 h-3 rounded-full bg-zinc-700"></span>
+              <span class="w-3 h-3 rounded-full bg-zinc-700"></span>
+              <span class="ml-2 text-xs font-mono text-zinc-400">
+                Crystal Studio <span class="text-zinc-600">/</span> <span class="text-zinc-300">feat/custom-model-id</span>
+              </span>
+            </div>
+
+            <!-- Tab Switchers -->
+            <div class="flex items-center gap-1 bg-zinc-950 p-1 rounded-md border border-zinc-800 text-xs">
+              <button class="hero-tab-btn px-2.5 py-1 rounded bg-zinc-800 text-white font-medium border border-zinc-700 transition-colors" data-tab="agent">
+                Agent Planner
+              </button>
+              <button class="hero-tab-btn px-2.5 py-1 rounded text-zinc-400 font-medium hover:text-zinc-200 border border-transparent transition-colors" data-tab="diff">
+                Monaco Diff
+              </button>
+              <button class="hero-tab-btn px-2.5 py-1 rounded text-zinc-400 font-medium hover:text-zinc-200 border border-transparent transition-colors" data-tab="worktree">
+                Git Worktrees
+              </button>
+              <button class="hero-tab-btn px-2.5 py-1 rounded text-zinc-400 font-medium hover:text-zinc-200 border border-transparent transition-colors" data-tab="terminal">
+                Terminal
+              </button>
+            </div>
+          </div>
+
+          <!-- Tab Pane 1: Agent Planner -->
+          <div id="tab-agent" class="hero-tab-pane p-5 font-mono text-xs text-zinc-300 space-y-4">
+            <div class="flex items-start gap-3">
+              <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-bold border border-zinc-700">USER</span>
+              <p class="text-zinc-200 text-sm">"Allow entering custom model IDs and ensure the box stays open even when input text is deleted."</p>
+            </div>
+
+            <div class="p-3.5 rounded-lg bg-zinc-900 border border-zinc-800 space-y-2">
+              <div class="flex items-center gap-2 text-zinc-200 font-medium">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Agent Planner: Executing 3-step strategy in isolated branch</span>
+              </div>
+              <div class="text-zinc-400 space-y-1 pl-4">
+                <div>[1] <span class="text-zinc-300">tool_executor.ast_lookup:</span> Scanned <code class="text-zinc-200">SettingsDialog.tsx</code></div>
+                <div>[2] <span class="text-zinc-300">git_worktree.create:</span> Branch <code class="text-zinc-200">feat/custom-model-id</code> isolated</div>
+                <div>[3] <span class="text-zinc-300">propose_edit:</span> Added persistent <code class="text-zinc-200">isCustomMode</code> state</div>
+              </div>
+            </div>
+
+            <div class="p-3 bg-zinc-900/60 border border-zinc-800 rounded-lg text-zinc-300 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                <span>Patch Ready for Review (SettingsDialog.tsx + ChatSidebar.tsx)</span>
+              </div>
+              <span class="px-2 py-0.5 rounded bg-zinc-800 text-white font-medium border border-zinc-700">Review Unified Diff</span>
+            </div>
+          </div>
+
+          <!-- Tab Pane 2: Monaco Diff -->
+          <div id="tab-diff" class="hero-tab-pane hidden p-5 font-mono text-xs text-zinc-300 space-y-2">
+            <div class="flex items-center justify-between text-zinc-400 border-b border-zinc-800 pb-2">
+              <span class="text-zinc-200">frontend/src/components/SettingsDialog.tsx</span>
+              <span class="text-xs bg-zinc-800 px-2 py-0.5 rounded text-zinc-400">Unified Inline Diff</span>
+            </div>
+            <pre class="bg-black/40 p-4 rounded-lg overflow-x-auto text-[11px] leading-relaxed">
+<span class="text-zinc-500"> 20 | </span> <span class="text-zinc-400">// Persistent custom mode flag so deleting input characters doesn't unmount the box</span>
+<span class="text-red-400">-21 |  const modelSelectValue = !draft.model.trim() ? '' : knownModel ? draft.model : '__custom__';</span>
+<span class="text-emerald-400">+21 |  const [isCustomMode, setIsCustomMode] = useState&lt;boolean&gt;(initialIsCustom);</span>
+<span class="text-emerald-400">+22 |  const selectValue = isCustomMode ? '__custom__' : (draft.model || '');</span>
+<span class="text-zinc-500"> 23 | </span> <span class="text-zinc-400">&lt;select value={selectValue} onChange={handleModelChange}&gt;</span>
+<span class="text-emerald-400">+24 |    &lt;option value="__custom__"&gt;Custom model id…&lt;/option&gt;</span>
+<span class="text-zinc-500"> 25 | </span> <span class="text-zinc-400">&lt;/select&gt;</span></pre>
+          </div>
+
+          <!-- Tab Pane 3: Git Worktrees -->
+          <div id="tab-worktree" class="hero-tab-pane hidden p-5 font-mono text-xs text-zinc-300 space-y-3">
+            <div class="text-zinc-400 text-xs">Worktree Isolation Architecture: Edits never pollute your main branch until accepted.</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+              <div class="p-3.5 rounded-lg bg-zinc-900 border border-zinc-800">
+                <div class="flex items-center justify-between text-zinc-400 mb-1">
+                  <span class="font-bold text-white">main</span>
+                  <span class="text-[10px] px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400">Pristine</span>
+                </div>
+                <p class="text-zinc-500 text-[11px]">C:\Users\saatw\MyApp</p>
+                <div class="text-zinc-400 text-[10px] mt-2">Zero uncommitted changes • Local working directory clean</div>
+              </div>
+              <div class="p-3.5 rounded-lg bg-zinc-900 border border-zinc-700">
+                <div class="flex items-center justify-between text-zinc-300 mb-1">
+                  <span class="font-bold text-white">feat/custom-model-id</span>
+                  <span class="text-[10px] px-1.5 py-0.2 rounded bg-zinc-800 text-emerald-400">AI Active</span>
+                </div>
+                <p class="text-zinc-500 text-[11px]">C:\Users\saatw\.crystal\worktrees\feat-custom</p>
+                <div class="text-zinc-300 text-[10px] mt-2">Isolated edits • Automatic rollback checkpoint active</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab Pane 4: Terminal Harness -->
+          <div id="tab-terminal" class="hero-tab-pane hidden p-5 font-mono text-xs text-zinc-300 space-y-2">
+            <pre class="bg-black/40 p-4 rounded-lg overflow-x-auto text-zinc-300 leading-relaxed text-[11px]">
+<span class="text-zinc-500">PS C:\Users\saatw\MyApp&gt;</span> <span class="text-white">crystal status</span>
+
+<span class="text-zinc-200 font-bold">=== Crystal AI Assistant Status ===</span>
+Backend Server:   <span class="text-emerald-400">ONLINE</span> (http://127.0.0.1:8000)
+Groq API Key:     CONFIGURED (gsk_kp...PxJB)
+Gemini API Key:   CONFIGURED (AIzaSy...4171)
+Default Model:    llama-3.3-70b-versatile
+Data Directory:   C:\Users\saatw\AppData\Roaming\Crystal
+
+<span class="text-zinc-500">PS C:\Users\saatw\MyApp&gt;</span> <span class="text-white">crystal stop</span>
+<span class="text-emerald-400">✔ Stopped Crystal server (PID 40900) on port 8000.</span></pre>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ================= LIVE WEB DEMO SECTION (blaid.duckdns.org) ================= -->
+  <section id="demo" class="py-16 border-y border-zinc-800/80 bg-zinc-900/40">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+        <div>
+          <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-zinc-800 text-emerald-400 text-xs font-mono font-medium mb-2 border border-zinc-700">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span>Live Online Deployment</span>
+          </div>
+          <h2 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">Try Crystal Directly In Your Browser</h2>
+          <p class="text-sm text-zinc-400 mt-1">
+            Access the live hosted version without installing anything on your computer.
+          </p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <a href="https://blaid.duckdns.org" target="_blank" class="px-5 py-2.5 rounded-lg bg-white hover:bg-zinc-200 text-black font-semibold text-xs transition-all flex items-center gap-2">
+            <span>Open blaid.duckdns.org</span>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- Live Demo Container -->
+      <div class="clean-card rounded-xl overflow-hidden border border-zinc-800">
+        <div class="bg-zinc-900/90 px-4 py-2.5 border-b border-zinc-800 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-zinc-700"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-zinc-700"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-zinc-700"></span>
+            <span class="ml-2 text-xs font-mono text-zinc-400">https://blaid.duckdns.org</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <a href="https://blaid.duckdns.org" target="_blank" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1 font-mono">
+              <span>Fullscreen</span>
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+            </a>
+          </div>
+        </div>
+
+        <!-- Placeholder with Load Embed Button -->
+        <div id="demo-placeholder" class="p-12 text-center bg-[#0c0c0f]">
+          <div class="max-w-md mx-auto space-y-4">
+            <p class="text-sm text-zinc-300">
+              The live demo runs the full Crystal assistant interface with repository mounting, Monaco editor, and chat capabilities.
+            </p>
+            <div class="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <button id="load-live-demo-btn" class="px-5 py-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-medium text-xs border border-zinc-700 transition-all flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span>Load Live Demo Inside This Page</span>
+              </button>
+              <a href="https://blaid.duckdns.org" target="_blank" class="px-5 py-2.5 rounded-lg bg-white hover:bg-zinc-200 text-black font-semibold text-xs transition-all flex items-center gap-1.5">
+                <span>Launch in New Tab &rarr;</span>
+              </a>
+            </div>
+            <p class="text-[11px] text-zinc-500 font-mono">Live URL: https://blaid.duckdns.org</p>
+          </div>
+        </div>
+
+        <!-- Embedded Iframe Target Container -->
+        <div id="demo-iframe-container" class="hidden"></div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ================= BENTO GRID FEATURES ================= -->
+  <section id="features" class="py-20">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="text-center max-w-2xl mx-auto mb-14">
+        <h2 class="text-xs uppercase tracking-widest text-zinc-400 font-mono font-semibold mb-2">Core Architecture</h2>
+        <p class="text-3xl font-extrabold text-white">Engineered For Autonomous Pair Programming</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+
+        <!-- Card 1: Autonomous Agent Planner -->
+        <div class="clean-card p-6 rounded-xl">
+          <div class="w-10 h-10 rounded-lg bg-zinc-800 text-white flex items-center justify-center mb-5 border border-zinc-700">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+          </div>
+          <h3 class="text-base font-bold text-white mb-2">Autonomous Agent Planner</h3>
+          <p class="text-xs text-zinc-400 leading-relaxed">
+            Multi-step tool calling engine. Reads files, queries AST trees, builds dependency graphs, executes terminal commands, and drafts unified diff proposals.
+          </p>
+        </div>
+
+        <!-- Card 2: Isolated Git Worktrees -->
+        <div id="worktrees" class="clean-card p-6 rounded-xl">
+          <div class="w-10 h-10 rounded-lg bg-zinc-800 text-white flex items-center justify-center mb-5 border border-zinc-700">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path></svg>
+          </div>
+          <h3 class="text-base font-bold text-white mb-2">Isolated Git Worktrees</h3>
+          <p class="text-xs text-zinc-400 leading-relaxed">
+            AI modifications occur in isolated worktrees. Your active local branch remains pristine until you review and accept proposals.
+          </p>
+        </div>
+
+        <!-- Card 3: Multi-Provider LLM Routing -->
+        <div class="clean-card p-6 rounded-xl">
+          <div class="w-10 h-10 rounded-lg bg-zinc-800 text-white flex items-center justify-center mb-5 border border-zinc-700">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+          </div>
+          <h3 class="text-base font-bold text-white mb-2">Dynamic Multi-LLM Router</h3>
+          <p class="text-xs text-zinc-400 leading-relaxed">
+            Switch between Groq (Llama 3.3, GPT-OSS) and Google Gemini (Gemini 2.5 Flash, Pro), or configure any custom model ID present with your key.
+          </p>
+        </div>
+
+        <!-- Card 4: Deep Semantic & AST Indexing -->
+        <div class="clean-card p-6 rounded-xl">
+          <div class="w-10 h-10 rounded-lg bg-zinc-800 text-white flex items-center justify-center mb-5 border border-zinc-700">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          </div>
+          <h3 class="text-base font-bold text-white mb-2">AST & Neural Embeddings</h3>
+          <p class="text-xs text-zinc-400 leading-relaxed">
+            Tree-sitter symbol indexing combined with local Chroma vector search. Finds related definitions, calls, and types across large repositories.
+          </p>
+        </div>
+
+        <!-- Card 5: Monaco Code Editor -->
+        <div class="clean-card p-6 rounded-xl">
+          <div class="w-10 h-10 rounded-lg bg-zinc-800 text-white flex items-center justify-center mb-5 border border-zinc-700">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+          </div>
+          <h3 class="text-base font-bold text-white mb-2">Monaco Code Studio</h3>
+          <p class="text-xs text-zinc-400 leading-relaxed">
+            Full VS Code editing fidelity with syntax highlighting, inline diff visualization, multi-tab layout, and real-time streaming code completions.
+          </p>
+        </div>
+
+        <!-- Card 6: Safety Policy Engine -->
+        <div class="clean-card p-6 rounded-xl">
+          <div class="w-10 h-10 rounded-lg bg-zinc-800 text-white flex items-center justify-center mb-5 border border-zinc-700">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+          </div>
+          <h3 class="text-base font-bold text-white mb-2">Safety Policy & Change Ledger</h3>
+          <p class="text-xs text-zinc-400 leading-relaxed">
+            Protection against unwanted modifications. Every operation is tracked in an auditable ledger with one-click checkpoint rollback.
+          </p>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ================= INTERACTIVE CLI SECTION ================= -->
+  <section id="cli" class="py-16 bg-[#0c0c10] border-t border-zinc-800/80">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="text-center max-w-2xl mx-auto mb-10">
+        <h2 class="text-xs uppercase tracking-widest text-zinc-400 font-mono font-semibold mb-2">Terminal Workflow</h2>
+        <p class="text-2xl sm:text-3xl font-bold text-white">Full Control With The `crystal` CLI</p>
+      </div>
+
+      <div class="clean-terminal overflow-hidden">
+        <div class="bg-zinc-900/90 p-2 border-b border-zinc-800 flex flex-wrap items-center gap-1.5">
+          <button class="cli-tab-btn px-3 py-1 rounded bg-zinc-800 text-white border border-zinc-700 text-xs font-mono transition-all" data-cli-target="open">crystal .</button>
+          <button class="cli-tab-btn px-3 py-1 rounded text-zinc-400 border border-transparent hover:text-zinc-300 text-xs font-mono transition-all" data-cli-target="chat">crystal chat</button>
+          <button class="cli-tab-btn px-3 py-1 rounded text-zinc-400 border border-transparent hover:text-zinc-300 text-xs font-mono transition-all" data-cli-target="index">crystal index</button>
+          <button class="cli-tab-btn px-3 py-1 rounded text-zinc-400 border border-transparent hover:text-zinc-300 text-xs font-mono transition-all" data-cli-target="config">crystal config</button>
+          <button class="cli-tab-btn px-3 py-1 rounded text-zinc-400 border border-transparent hover:text-zinc-300 text-xs font-mono transition-all" data-cli-target="stop">crystal stop</button>
+        </div>
+
+        <div class="p-6 font-mono text-xs">
+          <!-- CLI Pane 1: crystal . -->
+          <div id="cli-open" class="cli-pane space-y-2">
+            <div class="text-zinc-500"># Mount local folder and launch desktop harness:</div>
+            <div class="text-white font-bold">crystal .</div>
+            <div class="text-zinc-300 leading-relaxed pt-2">
+              ✔ Launched Crystal Desktop Application (Crystal.exe)<br>
+              ✔ FastAPI Server online at http://127.0.0.1:8000<br>
+              ✔ Mounted repository at C:\Users\saatw\Workspace\MyApp<br>
+              ✔ 248 source files indexed in 312ms
+            </div>
+          </div>
+
+          <!-- CLI Pane 2: crystal chat -->
+          <div id="cli-chat" class="cli-pane hidden space-y-2">
+            <div class="text-zinc-500"># Ask terminal coding questions with repository awareness:</div>
+            <div class="text-white font-bold">crystal chat "Refactor the database connection to use async pooling"</div>
+            <div class="text-zinc-300 leading-relaxed pt-2">
+              [Crystal Agent] Analyzing database/db.py...<br>
+              Found 2 connection classes using SQLite.<br>
+              Proposing switch to SQLAlchemy aiosqlite AsyncEngine.<br>
+              <span class="text-emerald-400">✔ Proposed diff written to active worktree branch.</span>
+            </div>
+          </div>
+
+          <!-- CLI Pane 3: crystal index -->
+          <div id="cli-index" class="cli-pane hidden space-y-2">
+            <div class="text-zinc-500"># Parse AST syntax trees and create local Chroma vector embeddings:</div>
+            <div class="text-white font-bold">crystal index .</div>
+            <div class="text-zinc-300 leading-relaxed pt-2">
+              Indexing C:\Users\saatw\MyApp...<br>
+              • Parsed 184 Python, TypeScript, and Rust AST trees<br>
+              • Generated 1,420 vector chunks in local Chroma DB<br>
+              <span class="text-emerald-400">✔ Codebase indexing complete (0.84s).</span>
+            </div>
+          </div>
+
+          <!-- CLI Pane 4: crystal config -->
+          <div id="cli-config" class="cli-pane hidden space-y-2">
+            <div class="text-zinc-500"># Configure API keys, default providers, and custom models:</div>
+            <div class="text-white font-bold">crystal config --set-groq-key "gsk_..." --set-model "llama-3.3-70b-versatile"</div>
+            <div class="text-zinc-300 leading-relaxed pt-2">
+              ✔ Groq API Key updated.<br>
+              ✔ Default model set to: llama-3.3-70b-versatile<br>
+              Configuration saved to %APPDATA%\Crystal\config.json
+            </div>
+          </div>
+
+          <!-- CLI Pane 5: crystal stop -->
+          <div id="cli-stop" class="cli-pane hidden space-y-2">
+            <div class="text-zinc-500"># Safely terminate any background server running on port 8000:</div>
+            <div class="text-white font-bold">crystal stop</div>
+            <div class="text-zinc-300 leading-relaxed pt-2">
+              <span class="text-emerald-400">✔ Stopped Crystal server (PID 40900) on port 8000.</span><br>
+              All child processes and sockets cleanly released.
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ================= DOWNLOAD MATRIX ================= -->
+  <section id="download" class="py-20">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="text-center max-w-2xl mx-auto mb-14">
+        <h2 class="text-xs uppercase tracking-widest text-zinc-400 font-mono font-semibold mb-2">Installation</h2>
+        <p class="text-3xl font-extrabold text-white">Get Started With Crystal</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+
+        <!-- Card 1: Web Demo -->
+        <div class="clean-card p-6 rounded-xl flex flex-col justify-between border-emerald-500/30">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950/60 text-emerald-400 border border-emerald-500/30">INSTANT</span>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1.5">Live Web Demo</h3>
+            <p class="text-xs text-zinc-400 mb-5">
+              Hosted online at blaid.duckdns.org. Zero setup or download required.
+            </p>
+            <div class="space-y-1 text-xs text-zinc-400 font-mono mb-5">
+              <div>Host: blaid.duckdns.org</div>
+              <div>Platform: Any browser</div>
+            </div>
+          </div>
+
+          <a href="https://blaid.duckdns.org" target="_blank" class="w-full py-2.5 px-3 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-medium text-xs text-center transition-all flex items-center justify-center gap-1.5">
+            <span>Launch Web Demo</span>
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+          </a>
+        </div>
+
+        <!-- Card 2: Windows Installer -->
+        <div class="clean-card p-6 rounded-xl flex flex-col justify-between border-zinc-600">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-white border border-zinc-700">RECOMMENDED</span>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1.5">Windows Installer</h3>
+            <p class="text-xs text-zinc-400 mb-5">
+              Full NSIS wizard installer with Desktop shortcut and PATH setup.
+            </p>
+            <div class="space-y-1 text-xs text-zinc-400 font-mono mb-5">
+              <div>Version: 0.1.0</div>
+              <div>Format: .EXE (x64)</div>
+            </div>
+          </div>
+
+          <a href="https://github.com/Saatwik-ss/Crystal-Desktop/releases/latest" target="_blank" class="w-full py-2.5 px-3 rounded-lg bg-white hover:bg-zinc-200 text-black font-semibold text-xs text-center transition-all flex items-center justify-center gap-1.5">
+            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.949-1.801"/></svg>
+            <span>Download .exe</span>
+          </a>
+        </div>
+
+        <!-- Card 3: Portable Zip -->
+        <div class="clean-card p-6 rounded-xl flex flex-col justify-between">
+          <div>
+            <div class="mb-4">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700">PORTABLE</span>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1.5">Portable Package</h3>
+            <p class="text-xs text-zinc-400 mb-5">
+              Extract and run anywhere without admin rights.
+            </p>
+            <div class="space-y-1 text-xs text-zinc-400 font-mono mb-5">
+              <div>Format: .ZIP (x64)</div>
+              <div>Admin: Not needed</div>
+            </div>
+          </div>
+
+          <a href="https://github.com/Saatwik-ss/Crystal-Desktop/releases/latest" target="_blank" class="w-full py-2.5 px-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-medium text-xs text-center border border-zinc-700 transition-all flex items-center justify-center gap-1.5">
+            <span>Download .zip</span>
+          </a>
+        </div>
+
+        <!-- Card 4: PowerShell 1-liner -->
+        <div class="clean-card p-6 rounded-xl flex flex-col justify-between">
+          <div>
+            <div class="mb-4">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700">CLI SCRIPT</span>
+            </div>
+            <h3 class="text-base font-bold text-white mb-1.5">PowerShell Script</h3>
+            <p class="text-xs text-zinc-400 mb-5">
+              One-command install from GitHub raw repository.
+            </p>
+            <div class="bg-black/50 p-2 rounded text-[10px] font-mono text-zinc-300 break-all mb-5">
+              irm https://raw.githubusercontent.com/.../install-windows.ps1 | iex
+            </div>
+          </div>
+
+          <button data-copy-target="ps-quick-cmd" class="w-full py-2.5 px-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-medium text-xs text-center border border-zinc-700 transition-all flex items-center justify-center gap-1.5">
+            <span>Copy Command</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Requirements Bar -->
+      <div class="mt-6 p-4 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-400 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <span class="text-zinc-200 font-medium">Requirements:</span> Windows 10/11 (64-bit) • Python 3.10+ • 4 GB RAM
+        </div>
+        <div class="text-zinc-500 font-mono">Open Source under MIT / Apache 2.0</div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ================= FAQ SECTION ================= -->
+  <section id="faq" class="py-16 bg-[#0c0c10] border-t border-zinc-800/80">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="text-center mb-12">
+        <h2 class="text-xs uppercase tracking-widest text-zinc-400 font-mono font-semibold mb-2">FAQ</h2>
+        <p class="text-2xl sm:text-3xl font-bold text-white">Frequently Asked Questions</p>
+      </div>
+
+      <div class="space-y-3">
+
+        <!-- FAQ Item 1 -->
+        <div class="faq-item clean-card rounded-lg overflow-hidden">
+          <button class="faq-trigger w-full px-5 py-3.5 text-left flex items-center justify-between text-white font-semibold text-xs hover:text-zinc-200 transition-colors">
+            <span>Where can I test the web demo version?</span>
+            <svg class="faq-icon w-3.5 h-3.5 text-zinc-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+          </button>
+          <div class="faq-content hidden px-5 pb-4 text-xs text-zinc-400 leading-relaxed border-t border-zinc-800 pt-2.5">
+            You can access the live hosted demo version at <a href="https://blaid.duckdns.org" target="_blank" class="text-white underline">https://blaid.duckdns.org</a> directly in your web browser with zero installation needed.
+          </div>
+        </div>
+
+        <!-- FAQ Item 2 -->
+        <div class="faq-item clean-card rounded-lg overflow-hidden">
+          <button class="faq-trigger w-full px-5 py-3.5 text-left flex items-center justify-between text-white font-semibold text-xs hover:text-zinc-200 transition-colors">
+            <span>What LLM providers does Crystal support?</span>
+            <svg class="faq-icon w-3.5 h-3.5 text-zinc-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+          </button>
+          <div class="faq-content hidden px-5 pb-4 text-xs text-zinc-400 leading-relaxed border-t border-zinc-800 pt-2.5">
+            Crystal natively routes between Groq (Llama 3.3 70B, GPT-OSS 120B) and Google Gemini (Gemini 2.5 Flash, Gemini 2.5 Pro). You can also configure any custom model ID present with your key or point to local endpoints (Ollama / vLLM).
+          </div>
+        </div>
+
+        <!-- FAQ Item 3 -->
+        <div class="faq-item clean-card rounded-lg overflow-hidden">
+          <button class="faq-trigger w-full px-5 py-3.5 text-left flex items-center justify-between text-white font-semibold text-xs hover:text-zinc-200 transition-colors">
+            <span>How do Git worktrees keep my codebase safe?</span>
+            <svg class="faq-icon w-3.5 h-3.5 text-zinc-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+          </button>
+          <div class="faq-content hidden px-5 pb-4 text-xs text-zinc-400 leading-relaxed border-t border-zinc-800 pt-2.5">
+            Rather than modifying files directly on your active working branch, Crystal creates an isolated Git worktree branch for AI proposals. Edits, tool runs, and test executions happen in the sandbox. You review the diff and choose whether to accept or discard.
+          </div>
+        </div>
+
+        <!-- FAQ Item 4 -->
+        <div class="faq-item clean-card rounded-lg overflow-hidden">
+          <button class="faq-trigger w-full px-5 py-3.5 text-left flex items-center justify-between text-white font-semibold text-xs hover:text-zinc-200 transition-colors">
+            <span>How do I stop the background server?</span>
+            <svg class="faq-icon w-3.5 h-3.5 text-zinc-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+          </button>
+          <div class="faq-content hidden px-5 pb-4 text-xs text-zinc-400 leading-relaxed border-t border-zinc-800 pt-2.5">
+            Closing the Crystal desktop window automatically terminates the background server. If running standalone, execute <code class="text-zinc-200 font-mono">crystal stop</code> from any terminal.
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="border-t border-zinc-800 bg-[#070709] py-10 text-xs text-zinc-500">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+      
+      <div class="flex items-center gap-2">
+        <img src="assets/icon.svg" alt="Crystal" class="w-5 h-5 opacity-60" />
+        <span class="text-zinc-400 font-medium">Crystal AI Coding Assistant</span>
+        <span>•</span>
+        <span>Open Source (MIT / Apache 2.0)</span>
+      </div>
+
+      <div class="flex items-center gap-5 text-zinc-400">
+        <a href="https://blaid.duckdns.org" target="_blank" class="hover:text-white transition-colors">Web Demo</a>
+        <a href="#features" class="hover:text-white transition-colors">Features</a>
+        <a href="#cli" class="hover:text-white transition-colors">CLI</a>
+        <a href="#download" class="hover:text-white transition-colors">Downloads</a>
+        <a href="https://github.com/Saatwik-ss/Crystal-Desktop" target="_blank" class="hover:text-white transition-colors">GitHub</a>
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- App Script -->
+  <script src="assets/app.js"></script>
+</body>
+</html>
