@@ -1,0 +1,778 @@
+
+import os
+import shutil
+import asyncio
+import threading
+import tempfile
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Optional, Dict, List, Any
+from datetime import datetime
+import logging
+from sqlalchemy import select, delete, func, desc
+from fastapi import UploadFile
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+import uuid
+from database.db import get_db, DATA_DIR
+from database.models import (Repository, RepositoryFile, IndexingStatus, CodeSnapshot, ChatSession, ChatMessage, UserSetting, Ticket, TicketAcceptanceCriteria, ChangeLedgerEvent)
+from .ast_service import ASTService
+from .embedding_service import EmbeddingService
+from .chunking_service import ChunkingService
+logger = logging.getLogger(__name__)
+UPLOAD_DIR = Path(os.getenv('UPLOAD_DIR', str(DATA_DIR / 'repos')))
+IGNORE_DIRS = {'node_modules', '.git', 'dist', 'build', 'venv', '__pycache__', '.venv', '.next', '.nuxt', '.cache', '.pytest_cache', '.mypy_cache'}
+IGNORE_FILES = {'.DS_Store', '*.pyc', '*.pyo', '*.pyd', '__pycache__', '.env'}
+
+class RepositoryFileWatcher(FileSystemEventHandler):
+    """Watch repository for changes and trigger re-indexing"""
+
+    def __init__(self, repo_id: str, callback, loop: Optional[asyncio.AbstractEventLoop] = None):
+        self.repo_id = repo_id
+        self.callback = callback
+        self.loop = loop
+        self.debounce_timer: Optional[threading.Timer] = None
+
+    def on_modified(self, event):
+        if event.is_directory:
+            return
+        if self.debounce_timer:
+            self.debounce_timer.cancel()
+        self.debounce_timer = threading.Timer(2.0, self._trigger)
+        self.debounce_timer.start()
+
+    def _trigger(self):
+        try:
+            target_loop = self.loop
+            if target_loop is None or not target_loop.is_running():
+                target_loop = asyncio.get_event_loop()
+            if target_loop.is_running():
+                asyncio.run_coroutine_threadsafe(self.callback(self.repo_id), target_loop)
+            else:
+                target_loop.run_until_complete(self.callback(self.repo_id))
+        except Exception as e:
+            logger.error(f"Error triggering re-index for {self.repo_id}: {e}")
+
+INDEX_COMMIT_BATCH = 30
+MAX_INDEX_ERRORS = 50
+# Dedicated pool so indexing I/O never starves aiosqlite (default executor).
+_INDEX_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="crystal-index")
+
+class RepositoryManager():
+
+    def __init__(self, embedding_service: Optional[EmbeddingService] = None):
+        self.upload_dir = UPLOAD_DIR
+        self.upload_dir.mkdir(parents=True, exist_ok=True)
+        self.watchers: Dict[(str, Observer)] = {}
+        self.indexing_status: Dict[(str, Dict[(str, Any)])] = {}
+        self.embedding_service = embedding_service
+
+    async def get_repo_path(self, repo_id: str, db: Optional[Any] = None) -> Path:
+        """Return the absolute Path for a repository, either from self.upload_dir or custom local path."""
+        upload_path = (self.upload_dir / repo_id)
+        if upload_path.exists():
+            return upload_path
+
+        close_after = False
+        if db is None:
+            db = await get_db()
+            close_after = True
+        try:
+            repo = await db.get(Repository, repo_id)
+            if repo and repo.path and Path(repo.path).exists():
+                return Path(repo.path)
+        finally:
+            if close_after:
+                await db.close()
+        return upload_path
+
+    async def list_repositories(self) -> List[Dict[str, Any]]:
+        """List all stored repositories / projects."""
+        db = await get_db()
+        try:
+            stmt = select(Repository).order_by(desc(Repository.updated_at))
+            res = await db.execute(stmt)
+            repos = res.scalars().all()
+
+            out = []
+            for r in repos:
+                fc_stmt = select(func.count(RepositoryFile.id)).where(RepositoryFile.repository_id == r.id)
+                fc_res = await db.execute(fc_stmt)
+                file_count = fc_res.scalar_one_or_none() or 0
+
+                exists_on_disk = Path(r.path).exists() if r.path else False
+
+                out.append({
+                    "id": r.id,
+                    "name": r.name,
+                    "path": r.path,
+                    "exists": exists_on_disk,
+                    "file_count": file_count,
+                    "created_at": r.created_at.isoformat() if r.created_at else "",
+                    "updated_at": r.updated_at.isoformat() if r.updated_at else "",
+                    "metadata": r.repo_metadata or {},
+                })
+            return out
+        finally:
+            await db.close()
+
+    async def open_local_repository(self, folder_path: str) -> Dict[str, Any]:
+        """Mount a local repository folder directly in-place without copying files."""
+        resolved_path = Path(folder_path).resolve()
+        if not resolved_path.exists() or not resolved_path.is_dir():
+            raise ValueError(f"Directory does not exist or is not a folder: {folder_path}")
+
+        # Deterministic UUID based on normalized path
+        repo_id = str(uuid.uuid5(uuid.NAMESPACE_URL, resolved_path.as_posix()))
+        db = await get_db()
+        try:
+            repo = await db.get(Repository, repo_id)
+            if not repo:
+                repo = Repository(
+                    id=repo_id,
+                    name=resolved_path.name or str(resolved_path),
+                    path=str(resolved_path),
+                    created_at=datetime.utcnow(),
+                )
+                db.add(repo)
+                await db.commit()
+
+            files = await self._traverse_repository(resolved_path)
+            self.indexing_status[repo_id] = {
+                'status': 'initializing',
+                'files_processed': 0,
+                'total_files': len(files),
+                'errors': [],
+            }
+
+            existing_paths = set((await db.scalars(
+                select(RepositoryFile.path).where(RepositoryFile.repository_id == repo_id)
+            )).all())
+
+            pending = 0
+            for f in files:
+                rel_path = f.relative_to(resolved_path).as_posix()
+                if rel_path not in existing_paths:
+                    ext = f.suffix.lower()
+                    size = f.stat().st_size
+                    content = f.read_text(encoding='utf-8', errors='ignore') if size < 300 * 1024 else ""
+                    db.add(RepositoryFile(
+                        repository_id=repo_id,
+                        path=rel_path,
+                        language=self._get_language(ext),
+                        content_hash=self._hash_content(content) if content else "",
+                        size=size,
+                    ))
+                    pending += 1
+                    if pending >= INDEX_COMMIT_BATCH:
+                        await db.commit()
+                        pending = 0
+                        await asyncio.sleep(0)
+
+            if pending:
+                await db.commit()
+
+            asyncio.create_task(self.index_repository(repo_id))
+
+            logger.info(f"Mounted local repository '{repo.name}' ({repo_id}) at {resolved_path}")
+            return {
+                "id": repo_id,
+                "name": repo.name,
+                "path": str(resolved_path),
+                "created_at": repo.created_at.isoformat() if repo.created_at else "",
+                "status": "indexing",
+            }
+        finally:
+            await db.close()
+
+    async def process_upload(self, files: List[UploadFile], repo_id: Optional[str] = None) -> str:
+        """Process uploaded files in batches of 30 and create or append repository records."""
+        is_new = not repo_id
+        if is_new:
+            repo_id = str(uuid.uuid4())
+        repo_path = (self.upload_dir / repo_id)
+        repo_path.mkdir(parents=True, exist_ok=True)
+
+        db = await get_db()
+        try:
+            if is_new:
+                db.add(Repository(
+                    id=repo_id,
+                    name=repo_id,
+                    path=str(repo_path),
+                    created_at=datetime.utcnow(),
+                ))
+                await db.commit()
+                self.indexing_status[repo_id] = {
+                    'status': 'initializing',
+                    'files_processed': 0,
+                    'total_files': 0,
+                    'errors': [],
+                }
+
+            pending = 0
+            added = 0
+            for idx, file in enumerate(files):
+                relative_name = (file.filename or f'file_{idx}').replace('\\', '/')
+                file_path = (repo_path / relative_name)
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                contents = await file.read()
+                with open(file_path, 'wb') as f:
+                    f.write(contents)
+                ext = Path(relative_name).suffix.lower()
+                db.add(RepositoryFile(
+                    repository_id=repo_id,
+                    path=str(relative_name),
+                    language=self._get_language(ext),
+                    content_hash=self._hash_content(contents.decode('utf-8', errors='ignore')),
+                    size=len(contents),
+                ))
+                pending += 1
+                added += 1
+                if pending >= INDEX_COMMIT_BATCH:
+                    await db.commit()
+                    pending = 0
+                    await asyncio.sleep(0)
+
+            if pending:
+                await db.commit()
+
+            status = self.indexing_status.setdefault(repo_id, {
+                'status': 'initializing',
+                'files_processed': 0,
+                'total_files': 0,
+                'errors': [],
+            })
+            status['total_files'] = int(status.get('total_files') or 0) + added
+            logger.info(f'Repository {repo_id} stored {added} files (batch of {INDEX_COMMIT_BATCH}) at {repo_path}')
+            return repo_id
+        finally:
+            await db.close()
+
+    def _record_index_error(self, repo_id: str, message: str) -> None:
+        errors = self.indexing_status.setdefault(repo_id, {}).setdefault('errors', [])
+        if len(errors) < MAX_INDEX_ERRORS:
+            errors.append(message)
+
+    async def index_repository(self, repo_id: str) -> None:
+        """
+        Index repository: generate AST, embeddings, and dependency graph.
+        Files are already populated in DB during process_upload.
+        """
+        db = None
+        try:
+            if repo_id not in self.indexing_status:
+                self.indexing_status[repo_id] = {
+                    'status': 'indexing',
+                    'files_processed': 0,
+                    'total_files': 0,
+                    'errors': [],
+                }
+            repo_path = await self.get_repo_path(repo_id)
+            self.indexing_status[repo_id]['status'] = 'indexing'
+            files = await self._traverse_repository(repo_path)
+            self.indexing_status[repo_id]['total_files'] = len(files)
+            db = await get_db()
+            ast_service = ASTService()
+            embedding_service = self.embedding_service or EmbeddingService()
+            chunking_service = ChunkingService(ast_service)
+            loop = asyncio.get_running_loop()
+            try:
+                await loop.run_in_executor(_INDEX_POOL, embedding_service.reset_collection, repo_id)
+            except Exception as reset_err:
+                logger.warning(f"Could not reset Chroma collection for {repo_id}: {reset_err}")
+
+            SKIP_EMBED_FILENAMES = {
+                'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'cargo.lock',
+                'poetry.lock', 'pipfile.lock', 'composer.lock', 'gemfile.lock'
+            }
+            SKIP_EMBED_SUFFIXES = {
+                '.min.js', '.min.css', '.map', '.bundle.js', '.chunk.js',
+                '.lock', '.csv', '.tsv', '.jsonl'
+            }
+
+            pending_since_commit = 0
+            for (idx, file_path) in enumerate(files):
+                try:
+                    relative_path = file_path.relative_to(repo_path).as_posix()
+                    file_size = file_path.stat().st_size
+                    content = await loop.run_in_executor(
+                        _INDEX_POOL,
+                        lambda p=file_path: p.read_text(encoding='utf-8', errors='ignore'),
+                    )
+                    ext = file_path.suffix.lower()
+                    language = self._get_language(ext)
+                    ast_data = None
+                    if language in ['python', 'javascript', 'typescript'] and file_size < 300 * 1024:
+                        try:
+                            ast_data = await loop.run_in_executor(
+                                _INDEX_POOL, ast_service.parse_file, content, language
+                            )
+                        except Exception as ast_err:
+                            logger.warning(f"AST parsing failed for {relative_path}: {ast_err}")
+
+                    existing = (await db.scalars(
+                        select(RepositoryFile).where(
+                            RepositoryFile.repository_id == repo_id,
+                            RepositoryFile.path == str(relative_path)
+                        )
+                    )).first()
+
+                    if existing:
+                        existing.language = language
+                        existing.content_hash = self._hash_content(content)
+                        existing.ast_data = ast_data
+                        existing.size = len(content)
+                    else:
+                        repo_file = RepositoryFile(
+                            repository_id=repo_id,
+                            path=str(relative_path),
+                            language=language,
+                            content_hash=self._hash_content(content),
+                            ast_data=ast_data,
+                            size=len(content)
+                        )
+                        db.add(repo_file)
+
+                    should_skip_embed = (
+                        file_path.name.lower() in SKIP_EMBED_FILENAMES
+                        or any(file_path.name.lower().endswith(s) for s in SKIP_EMBED_SUFFIXES)
+                        or file_size > 300 * 1024
+                    )
+
+                    if not should_skip_embed:
+                        try:
+                            chunks = chunking_service.chunk_file(content, str(relative_path), language, ast_data)
+                            if chunks:
+                                await embedding_service.store_symbol_embeddings(repo_id, chunks[:20])
+                        except Exception as emb_err:
+                            logger.warning(f"Embedding failed for {relative_path}: {emb_err}")
+                            self._record_index_error(repo_id, f"{relative_path}: {emb_err}")
+
+                    pending_since_commit += 1
+                    if pending_since_commit >= INDEX_COMMIT_BATCH:
+                        await db.commit()
+                        pending_since_commit = 0
+
+                    self.indexing_status[repo_id]['files_processed'] = (idx + 1)
+                except Exception as e:
+                    logger.error(f'Error processing file {file_path}: {e}')
+                    self._record_index_error(repo_id, str(e))
+                    self.indexing_status[repo_id]['files_processed'] = (idx + 1)
+
+                await asyncio.sleep(0)
+
+            if pending_since_commit:
+                await db.commit()
+            await db.close()
+            db = None
+
+            self.indexing_status[repo_id]['status'] = 'completed'
+            logger.info(f'Repository {repo_id} indexing completed successfully')
+
+            try:
+                await self._build_dependency_graph(repo_id)
+            except Exception as dg_err:
+                logger.warning(f"Dependency graph building failed: {dg_err}")
+        except Exception as e:
+            logger.error(f'Repository indexing failed for {repo_id}: {e}')
+            if repo_id in self.indexing_status:
+                self.indexing_status[repo_id]['status'] = 'failed'
+                self.indexing_status[repo_id]['error'] = str(e)
+        finally:
+            if db:
+                await db.close()
+
+    BINARY_EXTENSIONS = {
+        '.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg', '.webp', '.bmp', '.tiff',
+        '.exe', '.dll', '.so', '.dylib', '.bin', '.obj', '.o', '.a', '.lib',
+        '.zip', '.tar', '.gz', '.tgz', '.bz2', '.7z', '.rar', '.iso',
+        '.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx',
+        '.mp3', '.mp4', '.wav', '.avi', '.mov', '.mkv', '.webm',
+        '.woff', '.woff2', '.ttf', '.eot', '.otf',
+        '.pyc', '.pyo', '.pyd', '.class', '.jar', '.war',
+        '.db', '.sqlite', '.sqlite3',
+    }
+
+    async def _traverse_repository(self, repo_path: Path) -> List[Path]:
+        """Recursively traverse repository and collect code and text files."""
+
+        def should_ignore(path: Path) -> bool:
+            for part in path.parts:
+                if part in IGNORE_DIRS:
+                    return True
+                if part.startswith('.') and part != '.' and not part.startswith('.env') and not part.startswith('.git'):
+                    return True
+            if path.is_dir():
+                return False
+            if path.suffix.lower() in self.BINARY_EXTENSIONS:
+                return True
+            if path.name in IGNORE_FILES:
+                return True
+            try:
+                if path.stat().st_size > 5 * 1024 * 1024:
+                    return True
+            except Exception:
+                return True
+            return False
+
+        def collect() -> List[Path]:
+            files = []
+            for item in repo_path.rglob('*'):
+                if item.is_file() and not should_ignore(item):
+                    files.append(item)
+            return sorted(files)
+
+        return await asyncio.get_running_loop().run_in_executor(_INDEX_POOL, collect)
+
+    def _get_language(self, extension: str) -> str:
+        """Map file extension to language"""
+        ext = (extension or "").lower()
+        ext_map = {
+            '.py': 'python', '.js': 'javascript', '.ts': 'typescript', '.tsx': 'typescript',
+            '.jsx': 'javascript', '.java': 'java', '.cpp': 'cpp', '.c': 'c', '.h': 'c',
+            '.hpp': 'cpp', '.go': 'go', '.rs': 'rust', '.rb': 'ruby', '.php': 'php',
+            '.swift': 'swift', '.kt': 'kotlin', '.scala': 'scala', '.cs': 'csharp',
+            '.dart': 'dart', '.html': 'html', '.htm': 'html', '.css': 'css',
+            '.scss': 'scss', '.less': 'less', '.json': 'json', '.md': 'markdown',
+            '.markdown': 'markdown', '.txt': 'plaintext', '.yaml': 'yaml', '.yml': 'yaml',
+            '.xml': 'xml', '.sql': 'sql', '.sh': 'bash', '.bash': 'bash', '.zsh': 'bash',
+            '.ps1': 'powershell', '.bat': 'batch', '.vue': 'vue', '.svelte': 'svelte',
+            '.toml': 'toml', '.ini': 'ini', '.lua': 'lua', '.r': 'r',
+        }
+        return ext_map.get(ext, 'plaintext')
+
+    def _chunk_file(self, content: str, file_path: Path, chunk_size: int=1000) -> List[str]:
+        'Split file content into chunks for embedding'
+        chunks = []
+        lines = content.split('\n')
+        current_chunk = []
+        current_length = 0
+        for line in lines:
+            current_chunk.append(line)
+            current_length += len(line)
+            if (current_length > chunk_size):
+                chunks.append('\n'.join(current_chunk))
+                current_chunk = []
+                current_length = 0
+        if current_chunk:
+            chunks.append('\n'.join(current_chunk))
+        return chunks
+
+    def _hash_content(self, content: str) -> str:
+        'Generate hash of content for change detection'
+        import hashlib
+        return hashlib.sha256(content.encode()).hexdigest()
+
+    async def _build_dependency_graph(self, repo_id: str) -> None:
+        'Build dependency graph for repository'
+        db = None
+        try:
+            db = (await get_db())
+            ast_service = ASTService()
+            files = (await db.execute(
+                select(RepositoryFile.path).where(
+                    (RepositoryFile.repository_id == repo_id),
+                    (RepositoryFile.language == 'python'),
+                )
+            )).all()
+            dependency_graph = {}
+            repo_path = await self.get_repo_path(repo_id, db=db)
+            for idx, row in enumerate(files[:400]):
+                file_path = (repo_path / row.path)
+                try:
+                    content = file_path.read_text(encoding='utf-8', errors='ignore')
+                    ast_data = ast_service.parse_file(content, 'python')
+                    if ast_data:
+                        dependency_graph[row.path] = ast_data.get('imports', [])
+                except Exception as parse_err:
+                    logger.debug(f"Dependency parse skipped for {row.path}: {parse_err}")
+                if idx % 20 == 19:
+                    await asyncio.sleep(0)
+            repository = (await db.get(Repository, repo_id))
+            if repository:
+                repository.repo_metadata = {'dependencies': dependency_graph}
+            (await db.commit())
+        except Exception as e:
+            logger.error(f'Dependency graph building failed: {e}')
+        finally:
+            if db:
+                await db.close()
+
+    def _start_file_watcher(self, repo_id: str, repo_path: Path) -> None:
+        """Start file watcher for automatic re-indexing"""
+        try:
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            event_handler = RepositoryFileWatcher(repo_id, self.index_repository, loop=loop)
+            observer = Observer()
+            observer.schedule(event_handler, str(repo_path), recursive=True)
+            observer.start()
+            self.watchers[repo_id] = observer
+            logger.info(f'File watcher started for {repo_id}')
+        except Exception as e:
+            logger.error(f'Failed to start file watcher: {e}')
+
+    async def get_repository_status(self, repo_id: str) -> Dict[str, Any]:
+        """Get current indexing status from memory or persistent database."""
+        status = self.indexing_status.get(repo_id)
+        if status:
+            return {
+                'repository_id': repo_id,
+                'status': status.get('status') or 'completed',
+                'files_processed': int(status.get('files_processed') or 0),
+                'total_files': int(status.get('total_files') or 0),
+                'errors': status.get('errors') or [],
+                **({'error': status['error']} if status.get('error') else {}),
+            }
+
+        db = await get_db()
+        try:
+            idx_stmt = select(IndexingStatus).where(IndexingStatus.repository_id == repo_id).order_by(desc(IndexingStatus.updated_at))
+            idx_res = await db.execute(idx_stmt)
+            idx_record = idx_res.scalars().first()
+
+            fc_stmt = select(func.count(RepositoryFile.id)).where(RepositoryFile.repository_id == repo_id)
+            fc_res = await db.execute(fc_stmt)
+            file_count = fc_res.scalar() or 0
+
+            if idx_record:
+                total = max(idx_record.total_files or 0, file_count)
+                processed = max(idx_record.files_processed or 0, file_count)
+                rec_status = idx_record.status or ('completed' if file_count > 0 else 'completed')
+                if rec_status == 'indexing' and processed >= total:
+                    rec_status = 'completed'
+                return {
+                    'repository_id': repo_id,
+                    'status': rec_status,
+                    'files_processed': processed,
+                    'total_files': total,
+                    'errors': [],
+                    **({'error': idx_record.error} if idx_record.error else {}),
+                }
+
+            if file_count > 0:
+                return {
+                    'repository_id': repo_id,
+                    'status': 'completed',
+                    'files_processed': file_count,
+                    'total_files': file_count,
+                    'errors': [],
+                }
+
+            return {
+                'repository_id': repo_id,
+                'status': 'completed',
+                'files_processed': 0,
+                'total_files': 0,
+                'errors': [],
+            }
+        except Exception as e:
+            logger.error(f"Error fetching indexing status for {repo_id}: {e}")
+            return {
+                'repository_id': repo_id,
+                'status': 'completed',
+                'files_processed': 0,
+                'total_files': 0,
+                'errors': [str(e)],
+            }
+        finally:
+            await db.close()
+
+    async def list_files(self, repo_id: str) -> List[Dict[(str, Any)]]:
+        'List all files in repository'
+        db = (await get_db())
+        try:
+            rows = (await db.execute(
+                select(RepositoryFile.path, RepositoryFile.language, RepositoryFile.size).where(
+                    (RepositoryFile.repository_id == repo_id)
+                )
+            )).all()
+            return [{'path': r.path, 'language': r.language, 'size': r.size} for r in rows]
+        finally:
+            (await db.close())
+
+    async def read_file(self, repo_id: str, file_path: str) -> str:
+        'Read file content from repository'
+        file_path = file_path.replace('\\', '/')
+        db = await get_db()
+        try:
+            repo_file = (await db.scalars(select(RepositoryFile).where((RepositoryFile.repository_id == repo_id), (RepositoryFile.path == file_path)))).first()
+            if not repo_file:
+                raise FileNotFoundError(f'File not found: {file_path}')
+            repo_path = await self.get_repo_path(repo_id, db=db)
+            full_path = (repo_path / file_path)
+            return full_path.read_text(encoding='utf-8', errors='ignore')
+        finally:
+            await db.close()
+
+    async def write_file(self, repo_id: str, file_path: str, content: str) -> Dict[(str, Any)]:
+        'Write content to file and update database'
+        db = await get_db()
+        try:
+            repo_path = await self.get_repo_path(repo_id, db=db)
+            full_path = (repo_path / file_path)
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+            full_path.write_text(content, encoding='utf-8')
+            file_path_clean = file_path.replace('\\', '/')
+            repo_file = (await db.scalars(select(RepositoryFile).where((RepositoryFile.repository_id == repo_id), (RepositoryFile.path == file_path_clean)))).first()
+            ext = Path(file_path_clean).suffix.lower()
+            language = self._get_language(ext)
+            if repo_file:
+                repo_file.content_hash = self._hash_content(content)
+                repo_file.size = len(content)
+                repo_file.language = language
+            else:
+                repo_file = RepositoryFile(
+                    repository_id=repo_id,
+                    path=file_path_clean,
+                    language=language,
+                    content_hash=self._hash_content(content),
+                    ast_data=None,
+                    size=len(content)
+                )
+                db.add(repo_file)
+            (await db.commit())
+            return {'path': file_path_clean, 'status': 'saved', 'size': len(content)}
+        finally:
+            (await db.close())
+
+    async def get_repository_context(self, repo_id: str) -> Dict[(str, Any)]:
+        'Get comprehensive repository context for LLM'
+        db = (await get_db())
+        try:
+            rows = (await db.execute(
+                select(RepositoryFile.path, RepositoryFile.language).where(
+                    (RepositoryFile.repository_id == repo_id)
+                )
+            )).all()
+            files = [{'path': r.path, 'language': r.language} for r in rows]
+            languages = list({r.language for r in rows if r.language})
+            return {'files': files, 'total_files': len(files), 'languages': languages}
+        finally:
+            (await db.close())
+
+    async def cleanup_sql(self, repo_id: Optional[str] = None) -> Dict[str, Any]:
+        """Delete file/folder rows (and related records) from SQLite.
+
+        If repo_id is set, only that repository is removed. Otherwise every
+        stored repository, file, indexing row, and snapshot is wiped.
+        """
+        db = await get_db()
+        deleted = {
+            'repositories': 0,
+            'files': 0,
+            'indexing_status': 0,
+            'snapshots': 0,
+            'sessions': 0,
+            'messages': 0,
+            'tickets': 0,
+            'ticket_criteria': 0,
+            'ledger_events': 0,
+            'repo_ids': [],
+        }
+        try:
+            if repo_id:
+                repo_ids = [repo_id]
+            else:
+                rows = (await db.execute(select(Repository.id))).all()
+                repo_ids = [row.id for row in rows]
+
+            for rid in repo_ids:
+                # 1. Delete Chat Messages & Sessions
+                session_rows = (await db.execute(select(ChatSession.id).where(ChatSession.project_id == rid))).all()
+                session_ids = [s.id for s in session_rows]
+                if session_ids:
+                    msg_result = await db.execute(
+                        delete(ChatMessage).where(ChatMessage.session_id.in_(session_ids))
+                    )
+                    deleted['messages'] += msg_result.rowcount or 0
+                sess_result = await db.execute(
+                    delete(ChatSession).where(ChatSession.project_id == rid)
+                )
+                deleted['sessions'] += sess_result.rowcount or 0
+
+                # 2. Delete Ticket Criteria & Tickets
+                ticket_rows = (await db.execute(select(Ticket.id).where(Ticket.project_id == rid))).all()
+                ticket_ids = [t.id for t in ticket_rows]
+                if ticket_ids:
+                    crit_result = await db.execute(
+                        delete(TicketAcceptanceCriteria).where(TicketAcceptanceCriteria.ticket_id.in_(ticket_ids))
+                    )
+                    deleted['ticket_criteria'] += crit_result.rowcount or 0
+                tkt_result = await db.execute(
+                    delete(Ticket).where(Ticket.project_id == rid)
+                )
+                deleted['tickets'] += tkt_result.rowcount or 0
+
+                # 3. Delete Change Ledger Events
+                ledger_result = await db.execute(
+                    delete(ChangeLedgerEvent).where(ChangeLedgerEvent.project_id == rid)
+                )
+                deleted['ledger_events'] += ledger_result.rowcount or 0
+
+                # 4. Delete File metadata, Indexing Status, Code Snapshots & Repository
+                files_result = await db.execute(
+                    delete(RepositoryFile).where(RepositoryFile.repository_id == rid)
+                )
+                index_result = await db.execute(
+                    delete(IndexingStatus).where(IndexingStatus.repository_id == rid)
+                )
+                snap_result = await db.execute(
+                    delete(CodeSnapshot).where(CodeSnapshot.repository_id == rid)
+                )
+                repo_result = await db.execute(
+                    delete(Repository).where(Repository.id == rid)
+                )
+                deleted['files'] += files_result.rowcount or 0
+                deleted['indexing_status'] += index_result.rowcount or 0
+                deleted['snapshots'] += snap_result.rowcount or 0
+                deleted['repositories'] += repo_result.rowcount or 0
+                deleted['repo_ids'].append(rid)
+
+                # 5. Reset active_project_id setting if it matched this repo
+                active_row = await db.get(UserSetting, "active_project_id")
+                if active_row and active_row.value == rid:
+                    await db.execute(delete(UserSetting).where(UserSetting.key == "active_project_id"))
+                    deleted['active_project_reset'] = True
+
+                if rid in self.watchers:
+                    try:
+                        self.watchers[rid].stop()
+                        self.watchers[rid].join(timeout=2)
+                    except Exception:
+                        pass
+                    self.watchers.pop(rid, None)
+                self.indexing_status.pop(rid, None)
+
+                if self.embedding_service:
+                    try:
+                        self.embedding_service.delete_collection(rid)
+                    except Exception as emb_err:
+                        logger.warning(f'Chroma cleanup failed for {rid}: {emb_err}')
+
+                repo_path = self.upload_dir / rid
+                if repo_path.exists():
+                    shutil.rmtree(repo_path, ignore_errors=True)
+
+            await db.commit()
+            logger.info(f'SQL cleanup removed {deleted}')
+            return deleted
+        except Exception as e:
+            await db.rollback()
+            logger.error(f'SQL cleanup failed: {e}')
+            raise
+        finally:
+            await db.close()
+
+    def cleanup(self, repo_id: str) -> None:
+        'Clean up repository disk files and stop file watcher (SQL cleanup is async).'
+        if repo_id in self.watchers:
+            self.watchers[repo_id].stop()
+            self.watchers[repo_id].join()
+            del self.watchers[repo_id]
+        repo_path = (self.upload_dir / repo_id)
+        if repo_path.exists():
+            shutil.rmtree(repo_path)

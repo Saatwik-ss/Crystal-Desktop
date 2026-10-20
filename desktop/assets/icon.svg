@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#38bdf8;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1e1b4b;stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:#312e81;stop-opacity:0.9" />
+    </linearGradient>
+  </defs>
+  <!-- Background Rounded Rect -->
+  <rect width="512" height="512" rx="128" fill="url(#grad2)" />
+  
+  <!-- Crystal Polygon Facets -->
+  <polygon points="256,64 384,180 256,448 128,180" fill="url(#grad1)" opacity="0.85" />
+  <polygon points="256,64 384,180 256,220" fill="#93c5fd" opacity="0.7" />
+  <polygon points="256,64 128,180 256,220" fill="#60a5fa" opacity="0.9" />
+  <polygon points="128,180 256,220 256,448" fill="#4f46e5" opacity="0.8" />
+  <polygon points="384,180 256,220 256,448" fill="#7c3aed" opacity="0.75" />
+  
+  <!-- Core Glow Center -->
+  <circle cx="256" cy="220" r="16" fill="#ffffff" opacity="0.9" />
+</svg>

@@ -1,0 +1,37 @@
+appId: com.crystal.assistant
+productName: Crystal
+directories:
+  output: ../dist-desktop
+
+files:
+  - "main.js"
+  - "preload.js"
+  - "package.json"
+  - "assets/**"
+
+extraResources:
+  - from: "../bin"
+    to: "bin"
+  - from: "../backend"
+    to: "backend"
+  - from: "../frontend/dist"
+    to: "frontend/dist"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: zip
+      arch:
+        - x64
+  artifactName: "Crystal-Setup-${version}.${ext}"
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: "Crystal AI"
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
