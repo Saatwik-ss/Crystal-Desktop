@@ -1,6 +1,7 @@
 # Crystal AI Coding Assistant
+https://saatwik-ss.github.io/Crystal-Desktop/
 
-Crystal is a full-stack, state-of-the-art AI coding assistant and agentic pair programming harness with deep repository understanding, Monaco code editor, live code completion, AST parsing, neural embeddings, and multi-provider LLM support (Groq and Google Gemini).
+Crystal is a full-stack, AI coding assistant and agentic pair programming harness with deep repository understanding, Monaco code editor, live code completion, AST parsing, neural embeddings, and multi-provider LLM support (Groq and Google Gemini).
 
 Crystal runs as a native **Windows Desktop Application Harness**, a versatile **Terminal CLI tool (`crystal`)**, and a **Web Server**.
 
