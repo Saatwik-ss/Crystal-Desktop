@@ -114,6 +114,7 @@ class AgentPlanner:
         enable_planning: bool = False,
         worktree_path: Optional[str] = None,
         ticket_id: Optional[str] = None,
+        ollama_url: Optional[str] = None,
     ) -> AsyncIterator[Dict[str, Any]]:
         if conversation_history is None:
             conversation_history = []
@@ -123,6 +124,7 @@ class AgentPlanner:
             user_model=model,
             fallback_client=self.client,
             fallback_key=self.api_key,
+            ollama_url=ollama_url,
         )
 
         request_id = str(uuid.uuid4())

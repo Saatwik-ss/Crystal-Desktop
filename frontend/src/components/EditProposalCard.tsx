@@ -112,8 +112,8 @@ export default function EditProposalCard() {
     pendingEdits!.some((e) => e.validation && e.validation.ok === false);
 
   return (
-    <div className="mx-4 mb-3 border border-gray-600 rounded-lg bg-gray-800/80 overflow-hidden">
-      <div className="px-3 py-2 border-b border-gray-700 flex items-center justify-between">
+    <div className="mx-4 mb-3 border border-gray-600 rounded-lg bg-gray-800/80 overflow-hidden shrink-0 max-h-64 flex flex-col">
+      <div className="px-3 py-2 border-b border-gray-700 flex items-center justify-between shrink-0">
         <h4 className="text-sm font-medium text-white">
           {alreadyOnDisk
             ? 'Applied edits'
@@ -129,7 +129,7 @@ export default function EditProposalCard() {
       </div>
 
       {showPending ? (
-        <div className="p-3 space-y-3 max-h-80 overflow-y-auto">
+        <div className="p-3 space-y-3 flex-1 min-h-0 overflow-y-auto">
           {pendingEdits!.map((edit) => (
             <FileDiff key={edit.file_path} edit={edit} />
           ))}
@@ -140,7 +140,7 @@ export default function EditProposalCard() {
         </div>
       )}
 
-      <div className="px-3 py-2 border-t border-gray-700 flex items-center gap-2">
+      <div className="px-3 py-2 border-t border-gray-700 flex items-center gap-2 shrink-0">
         {showPending && !alreadyOnDisk ? (
           <>
             <button

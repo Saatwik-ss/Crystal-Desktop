@@ -233,7 +233,7 @@ export default function App() {
       </div>
 
       {sidebarOpen && (
-        <div className="bg-gray-800 border-l border-gray-700 flex flex-col overflow-hidden relative shrink-0" style={{ width: rightWidth }}>
+        <div className="bg-gray-800 border-l border-gray-700 flex flex-col overflow-hidden relative shrink-0 h-full" style={{ width: rightWidth }}>
           <div
             className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 z-10"
             onMouseDown={() => setIsDraggingRight(true)}

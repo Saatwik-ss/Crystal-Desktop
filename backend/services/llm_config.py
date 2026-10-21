@@ -38,6 +38,9 @@ _NO_TOOLS_SUBSTRINGS = (
     "whisper",
     "orpheus",
     "prompt-guard",
+    "llama3:8b",
+    "llama3:latest",
+    "llama3:70b",
 )
 
 # Known max completion tokens (conservative defaults when unknown).
@@ -112,6 +115,10 @@ def is_tools_not_supported_error(error: Any) -> bool:
         "tool calling" in text and "not supported" in text
     ) or (
         "tools" in text and "not supported" in text and "model" in text
+    ) or (
+        "does not support tools" in text
+    ) or (
+        "not support tools" in text
     )
 
 
@@ -551,6 +558,7 @@ def get_groq_client(
     user_model: Optional[str] = None,
     fallback_client: Any = None,
     fallback_key: Optional[str] = None,
+    ollama_url: Optional[str] = None,
 ) -> Tuple[Any, str, bool]:
     """
     Return (client, model_name, initialized).
@@ -565,7 +573,17 @@ def get_groq_client(
         is_gemini_key,
     )
 
-    provider = detect_provider(user_key, user_model)
+    provider = detect_provider(user_key, user_model, ollama_url=ollama_url)
+    if provider == "ollama":
+        url = (ollama_url or os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434/v1").strip()
+        model_name = resolve_provider_model("ollama", user_model)
+        logger.info(
+            "get_groq_client: routing to Ollama at %s with model=%s",
+            url,
+            model_name,
+        )
+        return create_provider_client("ollama", api_key=user_key or "ollama", model=model_name, base_url=url)
+
     if provider == "gemini":
         key = (user_key or "").strip() or os.getenv("GEMINI_API_KEY") or os.getenv("GROQ_API_KEY") or ""
         model_name = resolve_provider_model("gemini", user_model)

@@ -50,6 +50,7 @@ class CodeCompletionService:
         model: Optional[str] = None,
         user_system_prompt: Optional[str] = None,
         suffix: str = "",
+        ollama_url: Optional[str] = None,
     ) -> AsyncIterator[str]:
         """
         Stream code completion based on prefix (+ optional suffix for FIM-style fill).
@@ -59,6 +60,7 @@ class CodeCompletionService:
             user_model=model,
             fallback_client=self.client,
             fallback_key=self.api_key,
+            ollama_url=ollama_url,
         )
         if not initialized:
             yield json.dumps({

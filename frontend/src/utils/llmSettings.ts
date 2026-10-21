@@ -2,9 +2,10 @@ export interface LlmSettings {
   apiKey: string;
   model: string;
   systemPrompt: string;
+  ollamaUrl?: string;
 }
 
-/** Chat-capable models shown in Settings (not Whisper/TTS/guard). */
+/** Chat-capable cloud models shown in Settings (Groq / Gemini / OpenAI). */
 export const CHAT_MODEL_OPTIONS = [
   'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant',
@@ -21,10 +22,22 @@ export const CHAT_MODEL_OPTIONS = [
   'moonshotai/kimi-k2-instruct',
 ] as const;
 
+/** Popular local models for Ollama. */
+export const OLLAMA_POPULAR_MODELS = [
+  'llama3.2',
+  'llama3.3',
+  'qwen2.5-coder',
+  'deepseek-r1',
+  'codellama',
+  'mistral',
+  'phi4',
+] as const;
+
 export const DEFAULT_LLM_SETTINGS: LlmSettings = {
   apiKey: '',
   model: '',
   systemPrompt: '',
+  ollamaUrl: 'http://localhost:11434',
 };
 
 const STORAGE_KEY = 'crystal.llmSettings';
@@ -48,6 +61,7 @@ export function loadLlmSettings(): LlmSettings {
       // Drop invalid models saved from earlier free-text settings
       model: isChatModel(model) ? model : '',
       systemPrompt: typeof parsed.systemPrompt === 'string' ? parsed.systemPrompt : '',
+      ollamaUrl: typeof parsed.ollamaUrl === 'string' ? parsed.ollamaUrl : 'http://localhost:11434',
     };
   } catch {
     return { ...DEFAULT_LLM_SETTINGS };
@@ -58,6 +72,7 @@ export function saveLlmSettings(settings: LlmSettings): void {
   const cleaned: LlmSettings = {
     ...settings,
     model: isChatModel(settings.model) ? settings.model.trim() : '',
+    ollamaUrl: (settings.ollamaUrl || 'http://localhost:11434').trim(),
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
 }
@@ -66,13 +81,21 @@ export function llmPayload(settings: LlmSettings): {
   api_key?: string;
   model?: string;
   system_prompt?: string;
+  ollama_url?: string;
 } {
-  const payload: { api_key?: string; model?: string; system_prompt?: string } = {};
+  const payload: {
+    api_key?: string;
+    model?: string;
+    system_prompt?: string;
+    ollama_url?: string;
+  } = {};
   const apiKey = settings.apiKey.trim();
   const model = settings.model.trim();
   const systemPrompt = settings.systemPrompt.trim();
+  const ollamaUrl = settings.ollamaUrl?.trim();
   if (apiKey) payload.api_key = apiKey;
   if (model && isChatModel(model)) payload.model = model;
   if (systemPrompt) payload.system_prompt = systemPrompt;
+  if (ollamaUrl) payload.ollama_url = ollamaUrl;
   return payload;
 }

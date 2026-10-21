@@ -3,7 +3,7 @@ import { useAppStore } from '../store';
 import { apiClient, LOCAL_SESSION_ID } from '../api/client';
 import EditProposalCard from './EditProposalCard';
 import AgentProgressPanel from './AgentProgressPanel';
-import { Send, Trash2, X, Settings, ListTodo, Plus, Brain, ChevronDown, ChevronUp, GitCompare } from 'lucide-react';
+import { Send, Trash2, X, Settings, ListTodo, Plus, Brain, ChevronDown, ChevronUp, GitCompare, Square } from 'lucide-react';
 
 function ThoughtCard({ thought }: { thought: string }) {
   const [open, setOpen] = useState(false);
@@ -72,8 +72,32 @@ export default function ChatSidebar() {
     scrollToBottom();
   }, [chatMessages, streamingContent, pendingEdits, statusLine]);
 
+  const handleStopStreaming = () => {
+    const currentContent = useAppStore.getState().streamingContent;
+    const currentThought = useAppStore.getState().streamingThought;
+    if (currentContent || currentThought) {
+      addChatMessage({
+        role: 'assistant',
+        content: currentContent || '(Response stopped)',
+        thought: currentThought || undefined,
+        type: 'message',
+        timestamp: new Date().toISOString(),
+      });
+    }
+    useAppStore.setState({
+      isStreaming: false,
+      streamingContent: '',
+      streamingThought: '',
+      statusLine: null,
+    });
+  };
+
   const handleSendMessage = async () => {
-    if (!input.trim() || isStreaming) return;
+    if (!input.trim()) return;
+
+    if (isStreaming) {
+      handleStopStreaming();
+    }
 
     const userMessage = input.trim();
     setInput('');
@@ -123,8 +147,8 @@ export default function ChatSidebar() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-800 border-l border-gray-700">
-      <div className="p-3 border-b border-gray-700 flex flex-col gap-2 bg-gray-800">
+    <div className="h-full flex flex-col min-h-0 overflow-hidden bg-gray-800">
+      <div className="p-3 border-b border-gray-700 flex flex-col gap-2 bg-gray-800 shrink-0">
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1 mr-2">
             <h3 className="font-semibold text-white text-sm truncate" title={activeSessionTitle || 'AI Assistant'}>
@@ -188,7 +212,7 @@ export default function ChatSidebar() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
         {chatMessages.length === 0 && !isStreaming && !pendingEdits && (
           <div className="h-full flex items-center justify-center">
             <div className="text-center text-gray-400">
@@ -286,14 +310,13 @@ export default function ChatSidebar() {
 
       <EditProposalCard />
 
-      <div className="p-4 border-t border-gray-700">
+      <div className="p-4 border-t border-gray-700 shrink-0 bg-gray-800 z-10">
         <div className="flex items-center gap-2 mb-2">
           <button
             type="button"
             onClick={() => setEnablePlanning(!enablePlanning)}
-            disabled={isStreaming}
             className={clsx(
-              'flex items-center gap-1.5 px-2.5 py-1 rounded text-xs border transition-colors disabled:opacity-50',
+              'flex items-center gap-1.5 px-2.5 py-1 rounded text-xs border transition-colors',
               enablePlanning
                 ? 'bg-blue-600/30 border-blue-500 text-blue-100'
                 : 'bg-gray-700/80 border-gray-600 text-gray-400 hover:text-gray-200'
@@ -319,18 +342,31 @@ export default function ChatSidebar() {
                 handleSendMessage();
               }
             }}
-            placeholder="Ask about your code..."
-            disabled={isStreaming}
+            placeholder={isStreaming ? "Please Wait" : "Ask about your code..."}
             rows={1}
-            className="flex-1 bg-gray-700 text-white placeholder-gray-500 px-3 py-2 rounded border border-gray-600 focus:border-blue-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed resize-y min-h-[40px] max-h-[50vh]"
+            className="flex-1 bg-gray-700 text-white placeholder-gray-500 px-3 py-2 rounded border border-gray-600 focus:border-blue-500 focus:outline-none resize-y min-h-[40px] max-h-[50vh]"
           />
-          <button
-            onClick={handleSendMessage}
-            disabled={isStreaming || !input.trim()}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded transition-colors flex items-center gap-2"
-          >
-            <Send size={16} />
-          </button>
+          {isStreaming ? (
+            <button
+              type="button"
+              onClick={handleStopStreaming}
+              className="bg-red-600 hover:bg-red-700 text-white px-3.5 py-2 rounded transition-colors flex items-center gap-1.5 shrink-0 text-xs font-medium"
+              title="Stop AI response"
+            >
+              <Square size={13} className="fill-current" />
+              <span>Stop</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSendMessage}
+              disabled={!input.trim()}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded transition-colors flex items-center gap-2 shrink-0"
+              title="Send message (Enter)"
+            >
+              <Send size={16} />
+            </button>
+          )}
         </div>
 
         {activeFile && (

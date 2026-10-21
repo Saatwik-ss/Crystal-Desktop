@@ -45,6 +45,7 @@ class ChatService:
         api_key: Optional[str] = None,
         model: Optional[str] = None,
         user_system_prompt: Optional[str] = None,
+        ollama_url: Optional[str] = None,
     ) -> AsyncIterator[str]:
         """
         Stream chat response from LLM
@@ -61,6 +62,7 @@ class ChatService:
             user_model=model,
             fallback_client=self.client,
             fallback_key=self.api_key,
+            ollama_url=ollama_url,
         )
         if not initialized:
             yield json.dumps({

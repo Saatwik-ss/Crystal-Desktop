@@ -217,7 +217,6 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-<<<<<<< Updated upstream
 # Logs
 logs
 *.log
@@ -367,11 +366,11 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
-=======
 # Crystal Desktop & Installer Artifacts
 node_modules/
 dist-desktop/
 desktop/node_modules/
 desktop/dist/
 .crystal/
->>>>>>> Stashed changes
+
+scratch/

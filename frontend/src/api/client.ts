@@ -412,6 +412,27 @@ class APIClient {
 
   // Search
 
+  async fetchOllamaModels(url?: string): Promise<{
+    models: Array<{ id: string; name: string; size?: number; details?: any; modified_at?: string }>;
+    url: string;
+    connected: boolean;
+    error?: string;
+  }> {
+    try {
+      const response = await this.client.post('/ollama/models', {
+        url: url || 'http://localhost:11434',
+      });
+      return response.data;
+    } catch (err: any) {
+      return {
+        models: [],
+        url: url || 'http://localhost:11434',
+        connected: false,
+        error: err.response?.data?.error || err.message || 'Failed to connect to Ollama',
+      };
+    }
+  }
+
   async fetchModels(apiKey: string): Promise<string[]> {
     const response = await fetch(`${API_BASE_URL}/models`, {
       method: 'POST',

@@ -16,7 +16,7 @@ export default function AgentProgressPanel() {
   }
 
   return (
-    <div className="px-4 pb-2 space-y-2 border-b border-gray-700/80">
+    <div className="px-4 pb-2 space-y-2 border-b border-gray-700/80 shrink-0 max-h-48 overflow-y-auto">
       {agentStep && isStreaming ? (
         <p className="text-[11px] text-blue-300/90 font-mono">{agentStep}</p>
       ) : null}

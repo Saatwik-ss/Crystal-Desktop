@@ -382,7 +382,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   selectSession: async (sessionId: string, projectId?: string) => {
     try {
-      set({ chatLoading: true, activeSessionId: sessionId });
+      set({
+        chatLoading: true,
+        activeSessionId: sessionId,
+        isStreaming: false,
+        streamingContent: '',
+        streamingThought: '',
+        statusLine: null,
+        pendingEdits: null,
+        activeRequestId: null,
+      });
       const data = await apiClient.getSessionMessages(sessionId);
       const title = data.session?.title || 'Chat';
       const model = data.session?.model || null;
@@ -411,7 +420,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }).catch(() => undefined);
     } catch (e) {
       console.error(`Failed to select session ${sessionId}:`, e);
-      set({ chatLoading: false });
+      set({ chatLoading: false, isStreaming: false });
     }
   },
 
@@ -432,8 +441,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
         activeSessionModel: newSession.model,
         chatMessages: [],
         agentPlan: null,
+        terminalLogs: [],
+        pendingEdits: null,
+        activeRequestId: null,
+        agentStep: null,
+        statusLine: null,
         streamingContent: '',
+        streamingThought: '',
         isStreaming: false,
+        chatLoading: false,
       };
     });
 
@@ -549,6 +565,20 @@ export const useAppStore = create<AppStore>((set, get) => ({
       currentRepository: repo,
       indexingStatus: null,
       repositoryFiles: [],
+      openFiles: new Map(),
+      activeFile: null,
+      selectedCode: null,
+      pendingEdits: null,
+      activeRequestId: null,
+      lastAppliedRequest: null,
+      agentPlan: null,
+      terminalLogs: [],
+      agentStep: null,
+      statusLine: null,
+      streamingContent: '',
+      streamingThought: '',
+      isStreaming: false,
+      chatLoading: false,
     }),
   setRepositoryFiles: (files) =>
     set({
@@ -572,6 +602,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       return {
         openFiles: newOpenFiles,
         activeFile: file.path,
+        selectedCode: null,
       };
     }),
 
@@ -632,7 +663,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       };
     }),
 
-  setActiveFile: (path) => set({ activeFile: path }),
+  setActiveFile: (path) => set({ activeFile: path, selectedCode: null }),
 
   updateFileContent: (path, content) =>
     set((state) => {

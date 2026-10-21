@@ -212,6 +212,56 @@ app.include_router(chat_routes.router)
 app.include_router(search_routes.router)
 app.include_router(completion_routes.router)
 
+class OllamaModelsRequest(BaseModel):
+    url: Optional[str] = "http://localhost:11434"
+
+@app.post("/api/ollama/models")
+async def get_ollama_models(body: Optional[OllamaModelsRequest] = None):
+    raw_url = (body.url if body and body.url else "http://localhost:11434").strip().rstrip("/")
+    if not raw_url:
+        raw_url = "http://localhost:11434"
+    if raw_url.endswith("/v1"):
+        base_url = raw_url[:-3]
+    else:
+        base_url = raw_url
+
+    async with httpx.AsyncClient(timeout=4.0) as client:
+        try:
+            resp = await client.get(f"{base_url}/api/tags")
+            if resp.status_code == 200:
+                data = resp.json()
+                models = []
+                for m in data.get("models", []):
+                    name = m.get("name") or m.get("model")
+                    if name:
+                        models.append({
+                            "id": name,
+                            "name": name,
+                            "size": m.get("size"),
+                            "details": m.get("details", {}),
+                            "modified_at": m.get("modified_at"),
+                        })
+                return {"models": models, "url": base_url, "connected": True}
+        except Exception:
+            try:
+                resp = await client.get(f"{base_url}/v1/models")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    models = [{"id": m["id"], "name": m["id"]} for m in data.get("data", [])]
+                    return {"models": models, "url": base_url, "connected": True}
+            except Exception:
+                pass
+
+        return JSONResponse(
+            status_code=503,
+            content={
+                "connected": False,
+                "url": base_url,
+                "error": f"Cannot connect to Ollama at {base_url}. Make sure Ollama is installed and running (`ollama serve`).",
+                "models": []
+            }
+        )
+
 class ModelsRequest(BaseModel):
     api_key: str
 
@@ -957,6 +1007,7 @@ async def websocket_chat(websocket: WebSocket, repo_id: str):
                 enable_planning=bool(data.get("enable_planning")),
                 worktree_path=data.get("worktree_path"),
                 ticket_id=data.get("ticket_id"),
+                ollama_url=data.get("ollama_url"),
             ):
                 chunk_type = chunk.get("type")
                 if chunk_type == "message" and chunk.get("content"):
@@ -1035,6 +1086,7 @@ async def websocket_completion(websocket: WebSocket, repo_id: str):
                 model=data.get("model"),
                 user_system_prompt=data.get("system_prompt"),
                 suffix=data.get("suffix") or "",
+                ollama_url=data.get("ollama_url"),
             ):
                 if isinstance(chunk, str):
                     await websocket.send_json(json.loads(chunk))
@@ -1206,7 +1258,7 @@ if frontend_dist.exists():
             return FileResponse(file_path)
         index_file = frontend_dist / "index.html"
         if index_file.exists():
-            return FileResponse(index_file)
+            return FileResponse(index_file, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
         raise HTTPException(status_code=404, detail="Frontend index.html not found")
 
 if __name__ == "__main__":
@@ -1218,3 +1270,4 @@ if __name__ == "__main__":
         reload=True,
         log_level="info"
     )
+
